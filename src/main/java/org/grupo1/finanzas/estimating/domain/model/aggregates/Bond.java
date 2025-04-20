@@ -5,6 +5,7 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 import org.grupo1.finanzas.estimating.domain.model.commands.CreateBondCommand;
 import org.grupo1.finanzas.estimating.domain.model.valueobjects.*;
+import org.grupo1.finanzas.iam.domain.model.aggregates.User;
 import org.grupo1.finanzas.shared.domain.model.aggregates.AuditableAbstractAggregateRoot;
 
 import java.math.BigDecimal;
@@ -20,6 +21,10 @@ public class Bond extends AuditableAbstractAggregateRoot<Bond> {
     @NotBlank
     @Column(unique = true)
     private String bondName;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @NotNull private BigDecimal faceValue;
     @NotNull private BigDecimal issuePrice;
@@ -42,7 +47,7 @@ public class Bond extends AuditableAbstractAggregateRoot<Bond> {
 
     @NotNull private BigDecimal marketRate;
 
-    public Bond(CreateBondCommand command) {
+    public Bond(CreateBondCommand command, User user) {
         this.bondName = command.bondName();
         this.faceValue = command.faceValue();
         this.issuePrice = command.issuePrice();
@@ -59,5 +64,6 @@ public class Bond extends AuditableAbstractAggregateRoot<Bond> {
         this.graceInterest = command.graceInterest();
         this.commission = command.commission();
         this.marketRate = command.marketRate();
+        this.user = user;
     }
 }

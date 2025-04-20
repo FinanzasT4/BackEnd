@@ -4,6 +4,7 @@ import org.grupo1.finanzas.estimating.domain.model.aggregates.Bond;
 import org.grupo1.finanzas.estimating.domain.model.queries.GetAllBondsQuery;
 import org.grupo1.finanzas.estimating.domain.model.queries.GetBondByIdQuery;
 
+import org.grupo1.finanzas.estimating.domain.model.queries.GetBondsByUserIdQuery;
 import org.grupo1.finanzas.estimating.domain.services.BondQueryService;
 import org.grupo1.finanzas.estimating.infrastructure.persistence.jpa.repositories.BondRepository;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,11 @@ public class BondQueryServiceImpl implements BondQueryService {
     @Override
     public List<Bond> handle(GetAllBondsQuery query) {
         return bondRepository.findAll();
+    }
+
+    @Override
+    public List<Bond> handle(GetBondsByUserIdQuery query) {
+        return bondRepository.findByUserId(query.userId());
     }
 
     @Override

@@ -22,7 +22,8 @@ public class CreateBondCommandFromResourceAssembler {
                 resource.graceCapital(),
                 resource.graceInterest(),
                 resource.commission(),
-                resource.marketRate()
+                resource.marketRate(),
+                resource.userId() // 👈 nuevo campo
         );
     }
 }

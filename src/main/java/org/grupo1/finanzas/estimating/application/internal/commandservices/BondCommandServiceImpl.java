@@ -9,6 +9,8 @@ import org.grupo1.finanzas.estimating.domain.services.BondCommandService;
 import org.grupo1.finanzas.estimating.domain.services.EstimationCalculatorService;
 import org.grupo1.finanzas.estimating.infrastructure.persistence.jpa.repositories.BondRepository;
 import org.grupo1.finanzas.estimating.infrastructure.persistence.jpa.repositories.ResultRepository;
+import org.grupo1.finanzas.iam.domain.model.aggregates.User;
+import org.grupo1.finanzas.iam.infrastructure.persistence.jpa.repositories.UserRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -20,15 +22,23 @@ public class BondCommandServiceImpl implements BondCommandService {
     private final ResultRepository resultRepository;
     private final EstimationCalculatorService estimationCalculatorService;
 
-    public BondCommandServiceImpl(BondRepository bondRepository, ResultRepository resultRepository, EstimationCalculatorService estimationCalculatorService) {
+    private final UserRepository userRepository;
+
+    public BondCommandServiceImpl(BondRepository bondRepository, ResultRepository resultRepository, EstimationCalculatorService estimationCalculatorService, UserRepository userRepository) {
         this.bondRepository = bondRepository;
         this.resultRepository = resultRepository;
         this.estimationCalculatorService = estimationCalculatorService;
+        this.userRepository = userRepository;
     }
 
     @Override
     public Optional<Bond> handle(CreateBondCommand command) {
-        Bond bond = new Bond(command);
+
+        User user = userRepository.findById(command.userId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+
+        Bond bond = new Bond(command, user);
         Bond savedBond = bondRepository.save(bond);
 
         // Creamos un Result automáticamente para este Bond

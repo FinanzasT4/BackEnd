@@ -20,7 +20,8 @@ public record CreateBondCommand(
         int graceCapital,
         int graceInterest,
         BigDecimal commission,
-        BigDecimal marketRate
+        BigDecimal marketRate,
+        Long userId // 👈 nuevo campo
 ) {
     public CreateBondCommand {
         if (bondName == null || bondName.isBlank())
@@ -53,5 +54,7 @@ public record CreateBondCommand(
             throw new IllegalArgumentException("Commission must be between 0 and 100");
         if (marketRate == null || marketRate.compareTo(BigDecimal.ZERO) <= 0)
             throw new IllegalArgumentException("Market rate must be greater than 0");
+        if (userId == null || userId <= 0)
+            throw new IllegalArgumentException("User ID must be greater than 0");
     }
 }

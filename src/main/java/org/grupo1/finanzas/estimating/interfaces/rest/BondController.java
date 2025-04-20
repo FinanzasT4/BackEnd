@@ -3,6 +3,7 @@ package org.grupo1.finanzas.estimating.interfaces.rest;
 import org.grupo1.finanzas.estimating.domain.model.commands.DeleteBondByIdCommand;
 import org.grupo1.finanzas.estimating.domain.model.queries.GetAllBondsQuery;
 import org.grupo1.finanzas.estimating.domain.model.queries.GetBondByIdQuery;
+import org.grupo1.finanzas.estimating.domain.model.queries.GetBondsByUserIdQuery;
 import org.grupo1.finanzas.estimating.domain.services.BondCommandService;
 import org.grupo1.finanzas.estimating.domain.services.BondQueryService;
 import org.grupo1.finanzas.estimating.interfaces.rest.resources.BondResource;
@@ -32,6 +33,14 @@ public class BondController {
     @GetMapping
     public ResponseEntity<List<BondResource>> getAllBonds() {
         var query = new GetAllBondsQuery();
+        var bonds = bondQueryService.handle(query);
+        var bondResources = bonds.stream().map(BondResourceFromEntityAssembler::toResourceFromEntity).toList();
+        return ResponseEntity.ok(bondResources);
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<BondResource>> getBondsByUserId(@PathVariable Long userId) {
+        var query = new GetBondsByUserIdQuery(userId);
         var bonds = bondQueryService.handle(query);
         var bondResources = bonds.stream().map(BondResourceFromEntityAssembler::toResourceFromEntity).toList();
         return ResponseEntity.ok(bondResources);

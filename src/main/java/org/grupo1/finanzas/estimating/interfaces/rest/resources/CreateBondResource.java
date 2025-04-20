@@ -19,5 +19,6 @@ public record CreateBondResource(
         int graceCapital,
         int graceInterest,
         BigDecimal commission,
-        BigDecimal marketRate
+        BigDecimal marketRate,
+        Long userId // 👈 nuevo campo
 ) {}
