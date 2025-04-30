@@ -1,6 +1,7 @@
 package org.grupo1.finanzas.estimating.interfaces.rest;
 
 import org.grupo1.finanzas.estimating.domain.model.commands.DeleteBondByIdCommand;
+import org.grupo1.finanzas.estimating.domain.model.commands.UpdateBondCommand;
 import org.grupo1.finanzas.estimating.domain.model.queries.GetAllBondsQuery;
 import org.grupo1.finanzas.estimating.domain.model.queries.GetBondByIdQuery;
 import org.grupo1.finanzas.estimating.domain.model.queries.GetBondsByUserIdQuery;
@@ -8,6 +9,7 @@ import org.grupo1.finanzas.estimating.domain.services.BondCommandService;
 import org.grupo1.finanzas.estimating.domain.services.BondQueryService;
 import org.grupo1.finanzas.estimating.interfaces.rest.resources.BondResource;
 import org.grupo1.finanzas.estimating.interfaces.rest.resources.CreateBondResource;
+import org.grupo1.finanzas.estimating.interfaces.rest.resources.UpdateBondResource;
 import org.grupo1.finanzas.estimating.interfaces.rest.transform.BondResourceFromEntityAssembler;
 import org.grupo1.finanzas.estimating.interfaces.rest.transform.CreateBondCommandFromResourceAssembler;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -69,4 +71,37 @@ public class BondController {
         bondCommandService.handle(new DeleteBondByIdCommand(bondId));
         return ResponseEntity.ok("Bond with given ID successfully deleted");
     }
+
+    @PutMapping("/{bondId}")
+    public ResponseEntity<BondResource> updateBond(
+            @PathVariable Long bondId,
+            @RequestBody UpdateBondResource resource) {
+
+        var command = new UpdateBondCommand(
+                bondId,
+                resource.bondName(),
+                resource.faceValue(),
+                resource.issuePrice(),
+                resource.purchasePrice(),
+                resource.issueDate(),
+                resource.maturityDate(),
+                resource.totalPeriods(),
+                resource.rateType(),
+                resource.rateValue(),
+                resource.capitalization(),
+                resource.frequency(),
+                resource.graceType(),
+                resource.graceCapital(),
+                resource.graceInterest(),
+                resource.commission(),
+                resource.marketRate()
+        );
+
+        var bond = bondCommandService.handle(command);
+        if (bond.isEmpty()) return ResponseEntity.notFound().build();
+
+        var bondResource = BondResourceFromEntityAssembler.toResourceFromEntity(bond.get());
+        return ResponseEntity.ok(bondResource);
+    }
+
 }

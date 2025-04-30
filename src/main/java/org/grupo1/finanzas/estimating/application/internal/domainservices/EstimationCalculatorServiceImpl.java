@@ -6,7 +6,6 @@ import org.grupo1.finanzas.estimating.domain.model.commands.CreateResultCommand;
 import org.grupo1.finanzas.estimating.domain.model.entities.Period;
 import org.grupo1.finanzas.estimating.domain.model.valueobjects.GraceType;
 import org.grupo1.finanzas.estimating.domain.model.valueobjects.PeriodType;
-import org.grupo1.finanzas.estimating.domain.model.valueobjects.TimeConverter;
 import org.grupo1.finanzas.estimating.domain.services.EstimationCalculatorService;
 import org.springframework.stereotype.Service;
 
@@ -25,37 +24,41 @@ public class EstimationCalculatorServiceImpl implements EstimationCalculatorServ
         BigDecimal saldo = bond.getFaceValue();
         BigDecimal tea = bond.getRateValue().divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP);
 
-        TimeConverter converter = new TimeConverter(
-                PeriodType.valueOf(bond.getFrequency().name()),
-                1.0
-        );
-        double m = 1.0 / converter.convertToYear();
+        // Obtener el tipo de periodo a partir de la frecuencia
+        PeriodType periodType = PeriodType.fromFrequency(bond.getFrequency());
 
-        BigDecimal tes = BigDecimal.valueOf(
-                Math.pow(1 + tea.doubleValue(), 1.0 / m) - 1
-        ).setScale(10, RoundingMode.HALF_UP);
+                   // Convertir 1 unidad del periodo a la unidad base deseada
+            double conversionFactor = getConversionFactor(periodType);
 
-        BigDecimal interesTotal = BigDecimal.ZERO;
-        BigDecimal precioCompra = bond.getPurchasePrice();
-        BigDecimal flujoTotal = BigDecimal.ZERO;
+            // Número de periodos por año
+            double m = 1.0 / conversionFactor;
 
-        for (int i = 1; i <= bond.getTotalPeriods(); i++) {
-            BigDecimal interes = saldo.multiply(tes).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal amortizacion = BigDecimal.ZERO;
-            BigDecimal cuota = interes;
+            // Tasa efectiva por periodo
+            BigDecimal tes = BigDecimal.valueOf(
+                    Math.pow(1 + tea.doubleValue(), 1.0 / m) - 1
+            ).setScale(10, RoundingMode.HALF_UP);
 
-            String tipoGracia = determineGracia(i, bond);
-            if (tipoGracia.equals("T")) {
-                interes = BigDecimal.ZERO;
-                cuota = BigDecimal.ZERO;
-            } else if (tipoGracia.equals("P")) {
-                cuota = interes;
-            } else {
-                if (i == bond.getTotalPeriods()) {
-                    amortizacion = saldo;
-                    cuota = cuota.add(amortizacion);
+            BigDecimal interesTotal = BigDecimal.ZERO;
+            BigDecimal precioCompra = bond.getPurchasePrice();
+            BigDecimal flujoTotal = BigDecimal.ZERO;
+
+            for (int i = 1; i <= bond.getTotalPeriods(); i++) {
+                BigDecimal interes = saldo.multiply(tes).setScale(2, RoundingMode.HALF_UP);
+                BigDecimal amortizacion = BigDecimal.ZERO;
+                BigDecimal cuota = interes;
+
+                String tipoGracia = determineGracia(i, bond);
+                if (tipoGracia.equals("T")) {
+                    interes = BigDecimal.ZERO;
+                    cuota = BigDecimal.ZERO;
+                } else if (tipoGracia.equals("P")) {
+                    cuota = interes;
+                } else {
+                    if (i == bond.getTotalPeriods()) {
+                        amortizacion = saldo;
+                        cuota = cuota.add(amortizacion);
+                    }
                 }
-            }
 
             BigDecimal saldoFinal = saldo.subtract(amortizacion);
 
@@ -96,6 +99,20 @@ public class EstimationCalculatorServiceImpl implements EstimationCalculatorServ
                 maxMarketPrice.setScale(2, RoundingMode.HALF_UP)
         );
         return result;
+    }
+
+    private double getConversionFactor(PeriodType periodType) {
+        return switch ("year".toLowerCase()) {
+            case "day" -> periodType.toDays(1.0);
+            case "fortnight" -> periodType.toFortnights(1.0);
+            case "month" -> periodType.toMonths(1.0);
+            case "bimonthly" -> periodType.toBimonths(1.0);
+            case "quarter" -> periodType.toQuarters(1.0);
+            case "four_monthly" -> periodType.toFourMonths(1.0);
+            case "semester" -> periodType.toSemesters(1.0);
+            case "year" -> periodType.toYears(1.0);
+            default -> throw new IllegalArgumentException("Unsupported target unit: " + "year");
+        };
     }
 
     private String determineGracia(int period, Bond bond) {

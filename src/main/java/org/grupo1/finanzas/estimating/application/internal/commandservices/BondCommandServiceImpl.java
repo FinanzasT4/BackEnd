@@ -5,6 +5,7 @@ import org.grupo1.finanzas.estimating.domain.model.aggregates.Result;
 import org.grupo1.finanzas.estimating.domain.model.commands.CreateBondCommand;
 import org.grupo1.finanzas.estimating.domain.model.commands.CreateResultCommand;
 import org.grupo1.finanzas.estimating.domain.model.commands.DeleteBondByIdCommand;
+import org.grupo1.finanzas.estimating.domain.model.commands.UpdateBondCommand;
 import org.grupo1.finanzas.estimating.domain.services.BondCommandService;
 import org.grupo1.finanzas.estimating.domain.services.EstimationCalculatorService;
 import org.grupo1.finanzas.estimating.infrastructure.persistence.jpa.repositories.BondRepository;
@@ -61,4 +62,33 @@ public class BondCommandServiceImpl implements BondCommandService {
 
         bondRepository.deleteById(bond.idBond());
     }
+
+    @Override
+    public Optional<Bond> handle(UpdateBondCommand command) {
+        Optional<Bond> bondOpt = bondRepository.findById(command.bondId());
+        if (bondOpt.isEmpty()) return Optional.empty();
+
+        Bond bond = bondOpt.get();
+
+        bond.setBondName(command.bondName());
+        bond.setFaceValue(command.faceValue());
+        bond.setIssuePrice(command.issuePrice());
+        bond.setPurchasePrice(command.purchasePrice());
+        bond.setIssueDate(command.issueDate());
+        bond.setMaturityDate(command.maturityDate());
+        bond.setTotalPeriods(command.totalPeriods());
+        bond.setRateType(command.rateType());
+        bond.setRateValue(command.rateValue());
+        bond.setCapitalization(command.capitalization());
+        bond.setFrequency(command.frequency());
+        bond.setGraceType(command.graceType());
+        bond.setGraceCapital(command.graceCapital());
+        bond.setGraceInterest(command.graceInterest());
+        bond.setCommission(command.commission());
+        bond.setMarketRate(command.marketRate());
+
+        bondRepository.save(bond);
+        return Optional.of(bond);
+    }
+
 }

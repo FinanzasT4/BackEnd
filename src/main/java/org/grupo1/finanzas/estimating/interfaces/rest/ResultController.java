@@ -3,6 +3,7 @@ package org.grupo1.finanzas.estimating.interfaces.rest;
 import org.grupo1.finanzas.estimating.domain.model.commands.CreateResultCommand;
 import org.grupo1.finanzas.estimating.domain.model.commands.DeleteResultByIdCommand;
 import org.grupo1.finanzas.estimating.domain.model.queries.GetAllResultsQuery;
+import org.grupo1.finanzas.estimating.domain.model.queries.GetResultByBondIdQuery;
 import org.grupo1.finanzas.estimating.domain.model.queries.GetResultByIdQuery;
 import org.grupo1.finanzas.estimating.domain.services.ResultCommandService;
 import org.grupo1.finanzas.estimating.domain.services.ResultQueryService;
@@ -53,6 +54,16 @@ public class ResultController {
         var resource = ResultResourceFromEntityAssembler.toResourceFromEntity(result.get());
         return new ResponseEntity<>(resource, HttpStatus.CREATED);
     }
+
+    @GetMapping("/by-bond/{bondId}")
+    public ResponseEntity<ResultResource> getResultByBondId(@PathVariable Long bondId) {
+        var query = new GetResultByBondIdQuery(bondId);
+        var result = resultQueryService.handle(query);
+        if (result.isEmpty()) return ResponseEntity.notFound().build();
+        var resource = ResultResourceFromEntityAssembler.toResourceFromEntity(result.get());
+        return ResponseEntity.ok(resource);
+    }
+
 
     @DeleteMapping("/{resultId}")
     public ResponseEntity<?> deleteResult(@PathVariable Long resultId) {

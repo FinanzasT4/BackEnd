@@ -9,4 +9,6 @@ import java.util.Optional;
 public interface ResultQueryService {
     List<Result> handle(GetAllResultsQuery query);
     Optional<Result> handle(GetResultByIdQuery query);
+
+    Optional<Result> handle(GetResultByBondIdQuery query);
 }
