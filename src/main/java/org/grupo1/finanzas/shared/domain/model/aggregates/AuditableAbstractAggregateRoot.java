@@ -2,6 +2,7 @@ package org.grupo1.finanzas.shared.domain.model.aggregates;
 
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.Setter;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.domain.AbstractAggregateRoot;
@@ -12,6 +13,7 @@ import java.util.Date;
 @EntityListeners(AuditingEntityListener.class)
 @MappedSuperclass
 @Getter
+@Setter
 public class AuditableAbstractAggregateRoot<T extends AbstractAggregateRoot<T>> extends AbstractAggregateRoot<T> {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,9 +21,9 @@ public class AuditableAbstractAggregateRoot<T extends AbstractAggregateRoot<T>> 
 
     @CreatedDate
     //@Column(nullable = false, updatable = false)
-    private Date createAt;
+    private Date createdAt;
 
     @LastModifiedDate
     //@Column(nullable = false)
-    private Date updateAt;
+    private Date updatedAt;
 }
