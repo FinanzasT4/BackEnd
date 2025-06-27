@@ -1,9 +1,10 @@
 package org.grupo1.finanzas.estimating.domain.model.valueobjects;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.Optional;
 
+import static org.grupo1.finanzas.estimating.application.internal.domainservices.FinancialCalculatorServiceImpl.ROUNDING_MODE;
+import static org.grupo1.finanzas.estimating.application.internal.domainservices.FinancialCalculatorServiceImpl.DEFAULT_PRECISION;
 public record InterestRate(BigDecimal value, RateType type, Optional<Capitalization> capitalization) {
     public InterestRate {
         // Reglas de negocio encapsuladas aquí
@@ -15,15 +16,18 @@ public record InterestRate(BigDecimal value, RateType type, Optional<Capitalizat
         }
     }
 
-    // Ejemplo de lógica de negocio dentro del VO
     public BigDecimal toEffectiveAnnualRate() {
+        // La conversión de porcentaje a decimal ocurre aquí y solo aquí.
+        // El 'value' es el número que viene de la API (ej. 6.0)
+        BigDecimal rateAsDecimal = value.divide(BigDecimal.valueOf(100), DEFAULT_PRECISION, ROUNDING_MODE);
+
         if (type == RateType.EFFECTIVE) {
-            return value; // Asumimos que la tasa efectiva de entrada es anual.
+            return rateAsDecimal;
         }
-        // Lógica de conversión de nominal a efectiva anual
-        int m = capitalization.get().getPeriodsPerYear(); // Frecuencia de capitalización
-        // TEA = (1 + TN/m)^m - 1
-        BigDecimal ratePerPeriod = value.divide(BigDecimal.valueOf(m), 15, RoundingMode.HALF_UP);
+
+        // Lógica para Tasa Nominal
+       int m = capitalization.orElseThrow(() -> new IllegalStateException("Capitalization is required for nominal rate.")).getPeriodsPerYear();
+        BigDecimal ratePerPeriod = rateAsDecimal.divide(BigDecimal.valueOf(m), DEFAULT_PRECISION, ROUNDING_MODE);
         return BigDecimal.ONE.add(ratePerPeriod).pow(m).subtract(BigDecimal.ONE);
     }
 }

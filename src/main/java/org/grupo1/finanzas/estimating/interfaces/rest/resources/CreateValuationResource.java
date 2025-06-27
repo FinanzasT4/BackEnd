@@ -1,28 +1,55 @@
 package org.grupo1.finanzas.estimating.interfaces.rest.resources;
 
-import jakarta.validation.constraints.*; // Usamos validaciones aquí también
+import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-// NOTA: Este record es idéntico en estructura a CreateBondValuationCommand,
-// pero es una buena práctica mantenerlos separados. El Resource es el contrato
-// PÚBLICO, mientras que el Command es un detalle de implementación INTERNO.
 public record CreateValuationResource(
-        @NotBlank String valuationName,
+        @NotBlank @Size(min = 3, max = 50) String valuationName,
+
         @NotNull @Positive Long userId,
-        @NotNull @DecimalMin("0.01") BigDecimal faceValue,
-        @NotNull @DecimalMin("0.01") BigDecimal issuePrice,
-        @NotNull @DecimalMin("0.01") BigDecimal purchasePrice,
+
+        @NotNull @DecimalMin(value = "0.01", message = "Face value must be positive")
+        BigDecimal faceValue,
+
+        @NotNull @DecimalMin(value = "0.01", message = "Issue price must be positive")
+        BigDecimal issuePrice,
+
+        @NotNull @DecimalMin(value = "0.01", message = "Purchase price must be positive")
+        BigDecimal purchasePrice,
+
         @NotNull LocalDate issueDate,
-        @NotNull LocalDate maturityDate,
-        @NotNull @Min(1) int totalPeriods,
-        @NotBlank String rateType, // Como String para flexibilidad en la API
-        @NotNull @DecimalMin("0.0001") BigDecimal rateValue,
-        String capitalization, // Puede ser null
+
+        @NotNull @Future(message = "Maturity date must be in the future")
+        LocalDate maturityDate,
+
+        @NotNull @Min(value = 1, message = "Total periods must be at least 1")
+        int totalPeriods,
+
+        @NotBlank String rateType,
+
+        // CORRECCIÓN CLAVE: La tasa cupón puede ser 0 para bonos cero cupón.
+        @NotNull @DecimalMin(value = "0.0", message = "Rate value cannot be negative")
+        BigDecimal rateValue,
+
+        String capitalization, // Nullable
+
         @NotBlank String frequency,
+
         @NotBlank String graceType,
-        @NotNull @Min(0) int graceCapital,
-        @NotNull @Min(0) int graceInterest,
-        @NotNull @DecimalMin("0.0") @DecimalMax("100.0") BigDecimal commission,
-        @NotNull @DecimalMin("0.0001") BigDecimal marketRate
+
+        @NotNull @Min(value = 0, message = "Grace capital periods cannot be negative")
+        int graceCapital,
+
+        @NotNull @Min(value = 0, message = "Grace interest periods cannot be negative")
+        int graceInterest,
+
+        // La comisión puede ser 0, pero no negativa.
+        @NotNull @DecimalMin(value = "0.0", message = "Commission cannot be negative")
+        @DecimalMax(value = "100.0", message = "Commission cannot be over 100%")
+        BigDecimal commission,
+
+        // La tasa de mercado debe ser positiva.
+        @NotNull @DecimalMin(value = "0.0001", message = "Market rate must be positive")
+        BigDecimal marketRate
 ) {}
