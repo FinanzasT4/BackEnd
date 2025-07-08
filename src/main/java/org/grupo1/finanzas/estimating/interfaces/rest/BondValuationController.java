@@ -10,7 +10,7 @@ import org.grupo1.finanzas.estimating.domain.services.queryservices.BondValuatio
 import org.grupo1.finanzas.estimating.interfaces.rest.resources.CreateValuationResource;
 import org.grupo1.finanzas.estimating.interfaces.rest.resources.ValuationResource;
 import org.grupo1.finanzas.estimating.interfaces.rest.transform.ValuationCommandFromResourceAssembler;
-import org.grupo1.finanzas.estimating.interfaces.rest.transform.ValuationResourceFromEntityAssembler;
+import org.grupo1.finanzas.estimating.interfaces.rest.transform.ValuationResourceAssembler;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,38 +27,32 @@ public class BondValuationController {
 
     private final BondValuationCommandService commandService;
     private final BondValuationQueryService queryService;
-    private final ValuationCommandFromResourceAssembler assemblerResource;
-    private final ValuationResourceFromEntityAssembler assemblerDto;
+    // ELIMINAMOS LA INYECCIÓN DE LOS ASSEMBLERS
 
     @PostMapping
     public ResponseEntity<ValuationResource> createValuation(@Valid @RequestBody CreateValuationResource resource) {
-
-        // 1. Convertir Resource a Command
-        var command = assemblerResource.toCommandFromResource(resource);
+        var command = ValuationCommandFromResourceAssembler.toCommandFromResource(resource);
 
         // 2. Enviar el comando al servicio de aplicación
         var valuationId = commandService.handle(command)
                 .orElseThrow(() -> new RuntimeException("Error while creating valuation"));
 
-        // 3. Si se crea correctamente, obtener los datos para la respuesta
+        // 3. Obtener los datos para la respuesta
         var valuationDto = queryService.handle(new GetValuationByIdQuery(valuationId))
                 .orElseThrow(() -> new RuntimeException("Could not retrieve created valuation"));
 
-        // 4. Convertir el DTO de aplicación al Resource de API
+        var valuationResource = ValuationResourceAssembler.toResourceFromDto(valuationDto);
 
-        var valuationResource = assemblerDto.toResourceFromDto(valuationDto);
-
-        // 5. Devolver 201 Created con el objeto creado
+        // 5. Devolver 201 Created
         return new ResponseEntity<>(valuationResource, HttpStatus.CREATED);
     }
 
     @GetMapping("/{valuationId}")
     public ResponseEntity<ValuationResource> getValuationById(@PathVariable Long valuationId) {
-        var valuationDto = queryService.handle(new GetValuationByIdQuery(valuationId))
-                .orElseThrow(() -> new RuntimeException("Valuation not found")); // Idealmente, una excepción personalizada
-
-        var resource = assemblerDto.toResourceFromDto(valuationDto);
-        return ResponseEntity.ok(resource);
+        return queryService.handle(new GetValuationByIdQuery(valuationId))
+                .map(ValuationResourceAssembler::toResourceFromDto)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/user/{userId}")
@@ -66,7 +60,7 @@ public class BondValuationController {
         var dtoList = queryService.handle(new GetAllValuationsByUserIdQuery(userId));
 
         var resourceList = dtoList.stream()
-                .map(assemblerDto::toResourceFromDto)
+                .map(ValuationResourceAssembler::toResourceFromDto)
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(resourceList);

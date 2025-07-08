@@ -16,23 +16,17 @@ import java.util.stream.Collectors;
 @Mapper(componentModel = "spring")
 public interface BondValuationPersistenceMapper {
 
-    // ===================================================================
-    // == Mapeo de Dominio a Entidad de Persistencia (JPA) ==
-    // ===================================================================
-    // Para esta dirección, las anotaciones @Mapping funcionan bien porque la navegación
-    // es simple (desde un objeto anidado a campos planos).
     @Mappings({
             @Mapping(source = "id", target = "id"),
             @Mapping(source = "createdAt", target = "createdAt"),
             @Mapping(source = "updatedAt", target = "updatedAt"),
             @Mapping(source = "valuationName", target = "valuationName"),
             @Mapping(source = "userId.id", target = "userId"),
+            // Mapeos de Parámetros
             @Mapping(source = "parameters.faceValue.amount", target = "faceValueAmount"),
             @Mapping(source = "parameters.faceValue.currency", target = "faceValueCurrency"),
-            @Mapping(source = "parameters.issuePrice.amount", target = "issuePriceAmount"),
-            @Mapping(source = "parameters.issuePrice.currency", target = "issuePriceCurrency"),
-            @Mapping(source = "parameters.purchasePrice.amount", target = "purchasePriceAmount"),
-            @Mapping(source = "parameters.purchasePrice.currency", target = "purchasePriceCurrency"),
+            @Mapping(source = "parameters.marketPrice.amount", target = "marketPriceAmount"),
+            @Mapping(source = "parameters.marketPrice.currency", target = "marketPriceCurrency"),
             @Mapping(source = "parameters.issueDate", target = "issueDate"),
             @Mapping(source = "parameters.maturityDate", target = "maturityDate"),
             @Mapping(source = "parameters.totalPeriods", target = "totalPeriods"),
@@ -43,8 +37,14 @@ public interface BondValuationPersistenceMapper {
             @Mapping(source = "parameters.gracePeriod.type", target = "graceType"),
             @Mapping(source = "parameters.gracePeriod.capitalPeriods", target = "graceCapitalPeriods"),
             @Mapping(source = "parameters.gracePeriod.interestPeriods", target = "graceInterestPeriods"),
-            @Mapping(source = "parameters.commission", target = "commission"),
             @Mapping(source = "parameters.marketRate.value", target = "marketRateValue"),
+            // Mapeos de Costos (NUEVOS)
+            @Mapping(source = "parameters.issuerStructuringCost", target = "issuerStructuringCost"),
+            @Mapping(source = "parameters.issuerPlacementCost", target = "issuerPlacementCost"),
+            @Mapping(source = "parameters.issuerCavaliCost", target = "issuerCavaliCost"),
+            @Mapping(source = "parameters.investorSabCost", target = "investorSabCost"),
+            @Mapping(source = "parameters.investorCavaliCost", target = "investorCavaliCost"),
+            // Mapeos de Métricas
             @Mapping(source = "metrics.tcea", target = "tcea"),
             @Mapping(source = "metrics.trea", target = "trea"),
             @Mapping(source = "metrics.macaulayDuration", target = "macaulayDuration"),
@@ -58,14 +58,7 @@ public interface BondValuationPersistenceMapper {
     })
     BondValuationJpaEntity toJpaEntity(BondValuation domain);
 
-    // Metodo de ayuda para la lista
     List<CashFlowPeriodJpaEntity> cashFlowPeriodListToJpaEntityList(List<CashFlowPeriod> list);
-
-
-    // ===================================================================
-    // == Mapeo de Entidad de Persistencia (JPA) a Dominio (Implementación Manual) ==
-    // ===================================================================
-    // ABANDONAMOS LAS ANOTACIONES Y PROVEEMOS LA IMPLEMENTACIÓN COMPLETA
     default BondValuation toDomain(BondValuationJpaEntity jpaEntity) {
         if (jpaEntity == null) {
             return null;
@@ -73,16 +66,19 @@ public interface BondValuationPersistenceMapper {
 
         BondParameters parameters = new BondParameters(
                 new Money(jpaEntity.getFaceValueAmount(), jpaEntity.getFaceValueCurrency()),
-                new Money(jpaEntity.getIssuePriceAmount(), jpaEntity.getIssuePriceCurrency()),
-                new Money(jpaEntity.getPurchasePriceAmount(), jpaEntity.getPurchasePriceCurrency()),
+                new Money(jpaEntity.getMarketPriceAmount(), jpaEntity.getMarketPriceCurrency()),
                 jpaEntity.getIssueDate(),
                 jpaEntity.getMaturityDate(),
                 jpaEntity.getTotalPeriods(),
                 new InterestRate(jpaEntity.getCouponRateValue(), jpaEntity.getCouponRateType(), Optional.ofNullable(jpaEntity.getCouponRateCapitalization())),
                 jpaEntity.getFrequency(),
                 new GracePeriod(jpaEntity.getGraceType(), jpaEntity.getGraceCapitalPeriods(), jpaEntity.getGraceInterestPeriods()),
-                jpaEntity.getCommission(),
-                new InterestRate(jpaEntity.getMarketRateValue(), RateType.EFFECTIVE, Optional.empty())
+                new InterestRate(jpaEntity.getMarketRateValue(), RateType.EFFECTIVE, Optional.empty()),
+                jpaEntity.getIssuerStructuringCost(),
+                jpaEntity.getIssuerPlacementCost(),
+                jpaEntity.getIssuerCavaliCost(),
+                jpaEntity.getInvestorSabCost(),
+                jpaEntity.getInvestorCavaliCost()
         );
 
         FinancialMetrics metrics = null;
@@ -124,7 +120,6 @@ public interface BondValuationPersistenceMapper {
 
         CashFlowPeriodJpaEntity jpaEntity = new CashFlowPeriodJpaEntity();
 
-        // Mapeo explícito campo por campo
         jpaEntity.setPeriodNumber(domain.number());
         jpaEntity.setGracePeriodState(domain.gracePeriodState());
 
@@ -149,9 +144,6 @@ public interface BondValuationPersistenceMapper {
         return jpaEntity;
     }
 
-    /**
-     * Implementación MANUAL y EXPLÍCITA para mapear una entidad JPA a un CashFlowPeriod de dominio.
-     */
     default CashFlowPeriod cashFlowPeriodFromJpaEntity(CashFlowPeriodJpaEntity jpaEntity) {
         if (jpaEntity == null) return null;
 
@@ -166,8 +158,6 @@ public interface BondValuationPersistenceMapper {
                 new Money(jpaEntity.getCashFlowAmount(), jpaEntity.getCashFlowCurrency())
         );
     }
-
-    // Metodo de ayuda genérico para desenvolver Optional, usado en el @Mapping de 'toJpaEntity'.
     default <T> T fromOptional(Optional<T> optional) {
         return optional.orElse(null);
     }

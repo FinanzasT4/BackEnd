@@ -5,6 +5,7 @@ import org.grupo1.finanzas.iam.infrastructure.hashing.bcrypt.BCryptHashingServic
 import org.grupo1.finanzas.iam.infrastructure.tokens.jwt.BearerTokenService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest; // <-- IMPORTANTE AÑADIR ESTE IMPORT
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -62,15 +63,13 @@ public class WebSecurityConfiguration {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
-        http.cors(configurer -> {
-            configurer.configurationSource(c -> {
-                var cors = new CorsConfiguration();
-                cors.setAllowedOrigins(List.of("*"));
-                cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-                cors.setAllowedHeaders(List.of("*"));
-                return cors;
-            });
-        });
+        http.cors(configurer -> configurer.configurationSource(c -> {
+            var cors = new CorsConfiguration();
+            cors.setAllowedOrigins(List.of("*"));
+            cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+            cors.setAllowedHeaders(List.of("*"));
+            return cors;
+        }));
         http.csrf(AbstractHttpConfigurer::disable)
                 .exceptionHandling(exceptionHandling -> exceptionHandling.
                         authenticationEntryPoint(unauthorizedRequestHandler))
@@ -82,7 +81,10 @@ public class WebSecurityConfiguration {
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/swagger-resource/**",
-                                "/webjars/**").permitAll()
+                                "/webjars/**",
+                                "/actuator/**" // <-- AÑADIDO: Permite el acceso a TODOS los endpoints de Actuator
+                        ).permitAll()
+                        .requestMatchers(EndpointRequest.to("health")).permitAll()
                         .anyRequest().authenticated());
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(authorizationRequestFilter(), UsernamePasswordAuthenticationFilter.class);

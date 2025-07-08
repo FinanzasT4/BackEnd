@@ -9,12 +9,12 @@ import java.util.List;
  * Contiene todos los datos de entrada y de salida.
  */
 public record ValuationResource(
+        // --- Datos de Identificación ---
         Long id,
         String valuationName,
         Long userId,
-        // --- Parámetros de Entrada ---
-        BigDecimal faceValue,
-        LocalDate issueDate,
+
+        // --- Resultados Calculados (Métricas) ---
         BigDecimal tcea,
         BigDecimal trea,
         BigDecimal macaulayDurationInYears,
@@ -23,6 +23,21 @@ public record ValuationResource(
         BigDecimal dirtyPrice,
         BigDecimal cleanPrice,
 
-        // --- Flujo de Caja ---
+        // --- Parámetros de Entrada (Aplanados para conveniencia del cliente) ---
+        BigDecimal faceValue,
+        BigDecimal marketPrice,
+        LocalDate issueDate,
+        LocalDate maturityDate,
+        Integer totalPeriods,
+        String rateType,
+        BigDecimal rateValue,
+        String capitalization,
+        String frequency,
+        String graceType,
+        Integer graceCapital,
+        Integer graceInterest,
+        BigDecimal marketRate,
+
+        // --- Flujo de Caja Detallado ---
         List<CashFlowPeriodResource> cashFlow
 ) {}

@@ -15,25 +15,18 @@ import java.util.stream.IntStream;
 @Service
 public class FinancialCalculatorServiceImpl implements FinancialCalculatorService {
 
-    public static final int DEFAULT_PRECISION = 15;
+    public static final int DEFAULT_PRECISION = 16;
     private static final int FINANCIAL_PRECISION = 8;
     public static final RoundingMode ROUNDING_MODE = RoundingMode.HALF_UP;
 
-    // ===================================================================
-    // == 1. METODO PRINCIPAL DE LA INTERFAZ ==
-    // ===================================================================
-
     @Override
     public CalculationResult calculate(BondParameters params) {
-        // --- Paso 1: Calcular tasas periódicas ---
         int periodsPerYear = getPeriodsPerYear(params.frequency());
-        BigDecimal couponRatePerPeriod = getCouponRatePerPeriod(params.couponRate(), periodsPerYear);
-        BigDecimal marketRatePerPeriod = getMarketRatePerPeriod(params.marketRate(), periodsPerYear);
+        BigDecimal couponRatePerPeriod = convertToPeriodicRate(params.couponRate(), periodsPerYear);
+        BigDecimal marketRatePerPeriod = convertToPeriodicRate(params.marketRate(), periodsPerYear);
 
-        // --- Paso 2: Generar el flujo de caja ---
         List<CashFlowPeriod> cashFlow = generateCashFlow(params, couponRatePerPeriod);
 
-        // --- Paso 3: Calcular todas las métricas financieras ---
         FinancialMetrics metrics = calculateMetrics(params, cashFlow, marketRatePerPeriod, periodsPerYear);
 
         return new CalculationResult(metrics, cashFlow);
@@ -43,28 +36,26 @@ public class FinancialCalculatorServiceImpl implements FinancialCalculatorServic
     // == 2. MÉTODOS DE AYUDA PARA CÁLCULOS INTERNOS ==
     // ===================================================================
 
-    // --- Conversión de Tasas y Frecuencias ---
+    // --- Conversión de Tasas y Frecuencias (Refactorizado para claridad) ---
 
     private int getPeriodsPerYear(Frequency frequency) {
         return switch (frequency) {
             case SEMESTER -> 2;
             case QUARTER -> 4;
             case MONTH -> 12;
+            case BIMONTHLY -> 6;
+            case FOUR_MONTHLY -> 3;
+            case FORTNIGHT -> 24;
+            case DAY -> 360; // Usar base 360 como es común en finanzas
             default -> 1; // Para YEAR
         };
     }
 
-    private BigDecimal getCouponRatePerPeriod(InterestRate annualCouponRate, int periodsPerYear) {
-        // Correcto: Llama a toEffectiveAnnualRate, que ya devuelve un decimal.
-        BigDecimal effectiveAnnualRate = annualCouponRate.toEffectiveAnnualRate();
-        return BigDecimal.valueOf(Math.pow(1 + effectiveAnnualRate.doubleValue(), 1.0 / periodsPerYear) - 1)
-                .setScale(DEFAULT_PRECISION, ROUNDING_MODE);
-    }
-
-    private BigDecimal getMarketRatePerPeriod(InterestRate annualMarketRate, int periodsPerYear) {
-        // Correcto: Llama a toEffectiveAnnualRate, que ya devuelve un decimal.
-        BigDecimal effectiveAnnualRate = annualMarketRate.toEffectiveAnnualRate();
-        return BigDecimal.valueOf(Math.pow(1 + effectiveAnnualRate.doubleValue(), 1.0 / periodsPerYear) - 1)
+    private BigDecimal convertToPeriodicRate(InterestRate annualRate, int periodsPerYear) {
+        BigDecimal effectiveAnnualRate = annualRate.toEffectiveAnnualRate();
+        double base = 1.0 + effectiveAnnualRate.doubleValue();
+        double exponent = 1.0 / periodsPerYear;
+        return BigDecimal.valueOf(Math.pow(base, exponent) - 1)
                 .setScale(DEFAULT_PRECISION, ROUNDING_MODE);
     }
 
@@ -76,25 +67,32 @@ public class FinancialCalculatorServiceImpl implements FinancialCalculatorServic
         for (int i = 1; i <= params.totalPeriods(); i++) {
             BigDecimal initialBalance = currentBalance;
             BigDecimal interest = initialBalance.multiply(couponRatePerPeriod);
-            BigDecimal coupon = interest;
             BigDecimal amortization = BigDecimal.ZERO;
-
-            if (i == params.totalPeriods()) {
-                amortization = initialBalance;
-            }
+            BigDecimal couponPayment;
 
             GracePeriodState graceState = determineGraceState(i, params.gracePeriod());
 
             if (graceState == GracePeriodState.TOTAL) {
-                coupon = BigDecimal.ZERO;
+                // Durante gracia total, el pago del cupón es CERO.
+                couponPayment = BigDecimal.ZERO;
+                // El interés generado se capitaliza (se suma al saldo).
+                currentBalance = currentBalance.add(interest);
+            } else {
+                // En gracia parcial o sin gracia, el pago del cupón es el interés generado.
+                couponPayment = interest;
             }
 
-            BigDecimal cashFlowForHolder = coupon.add(amortization);
+            // La amortización solo ocurre en el último período para un bono bullet.
+            if (i == params.totalPeriods()) {
+                amortization = initialBalance;
+            }
+
+            BigDecimal cashFlowForHolder = couponPayment.add(amortization);
             BigDecimal finalBalance = currentBalance.subtract(amortization);
 
             periods.add(new CashFlowPeriod(
                     i, graceState, new Money(initialBalance), new Money(interest),
-                    new Money(coupon), new Money(amortization),
+                    new Money(couponPayment), new Money(amortization),
                     new Money(finalBalance), new Money(cashFlowForHolder)
             ));
 
@@ -103,13 +101,13 @@ public class FinancialCalculatorServiceImpl implements FinancialCalculatorServic
         return periods;
     }
 
+
     private GracePeriodState determineGraceState(int currentPeriod, GracePeriod gracePeriod) {
         if (gracePeriod.type() == GraceType.TOTAL && currentPeriod <= gracePeriod.capitalPeriods()) {
             return GracePeriodState.TOTAL;
         }
+        // Asumiendo que "gracia parcial" aplica hasta el final del periodo de gracia de capital
         if (gracePeriod.type() == GraceType.PARTIAL && currentPeriod <= gracePeriod.capitalPeriods()) {
-            // Para un bono bullet, la gracia parcial no tiene efecto en el cálculo del cupón (siempre es el interés)
-            // pero es bueno marcarlo para claridad en la respuesta.
             return GracePeriodState.PARTIAL;
         }
         return GracePeriodState.NONE;
@@ -119,25 +117,23 @@ public class FinancialCalculatorServiceImpl implements FinancialCalculatorServic
 
     private FinancialMetrics calculateMetrics(BondParameters params, List<CashFlowPeriod> cashFlow, BigDecimal marketRatePerPeriod, int periodsPerYear) {
         List<BigDecimal> holderFlowsList = cashFlow.stream().map(p -> p.cashFlow().amount()).collect(Collectors.toList());
-        BigDecimal dirtyPrice = calculatePresentValue(holderFlowsList, marketRatePerPeriod);
+        BigDecimal bondPrice = calculatePresentValue(holderFlowsList, marketRatePerPeriod);
 
-        BigDecimal macaulayDurationInPeriods = calculateMacaulayDurationInPeriods(cashFlow, marketRatePerPeriod, dirtyPrice);
+        BigDecimal macaulayDurationInPeriods = calculateMacaulayDurationInPeriods(cashFlow, marketRatePerPeriod, bondPrice);
         BigDecimal macaulayDurationInYears = macaulayDurationInPeriods.divide(BigDecimal.valueOf(periodsPerYear), FINANCIAL_PRECISION, ROUNDING_MODE);
 
         BigDecimal modifiedDurationInPeriods = macaulayDurationInPeriods.divide(BigDecimal.ONE.add(marketRatePerPeriod), DEFAULT_PRECISION, ROUNDING_MODE);
         BigDecimal modifiedDurationInYears = modifiedDurationInPeriods.divide(BigDecimal.valueOf(periodsPerYear), FINANCIAL_PRECISION, ROUNDING_MODE);
 
-        BigDecimal convexityInPeriods = calculateConvexityInPeriods(cashFlow, marketRatePerPeriod, dirtyPrice);
+        BigDecimal convexityInPeriods = calculateConvexityInPeriods(cashFlow, marketRatePerPeriod, bondPrice);
         BigDecimal convexityInYearsSq = convexityInPeriods.divide(BigDecimal.valueOf((long) periodsPerYear * periodsPerYear), FINANCIAL_PRECISION, ROUNDING_MODE);
 
-        BigDecimal trea = calculateAnnualIRR(getHolderCashFlow(params, cashFlow), periodsPerYear);
-        BigDecimal tcea = calculateAnnualIRR(getIssuerCashFlow(params, cashFlow), periodsPerYear);
-
-        // Simplificación
+        BigDecimal trea = calculateAnnualIRR(getHolderCashFlowWithCosts(params, cashFlow), periodsPerYear);
+        BigDecimal tcea = calculateAnnualIRR(getIssuerCashFlowWithCosts(params, cashFlow), periodsPerYear);
 
         return new FinancialMetrics(
                 tcea, trea, macaulayDurationInYears, modifiedDurationInYears,
-                convexityInYearsSq, new Money(dirtyPrice), new Money(dirtyPrice)
+                convexityInYearsSq, new Money(bondPrice), new Money(bondPrice) // Distinguir 'dirty' y 'clean' price si se necesita
         );
     }
 
@@ -148,6 +144,7 @@ public class FinancialCalculatorServiceImpl implements FinancialCalculatorServic
     }
 
     private BigDecimal calculateMacaulayDurationInPeriods(List<CashFlowPeriod> cashFlow, BigDecimal discountRate, BigDecimal price) {
+        if (price.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO;
         BigDecimal weightedTimeSum = IntStream.range(0, cashFlow.size())
                 .mapToObj(i -> {
                     BigDecimal periodTime = BigDecimal.valueOf(i + 1);
@@ -156,44 +153,85 @@ public class FinancialCalculatorServiceImpl implements FinancialCalculatorServic
                     return flow.multiply(pvFactor).multiply(periodTime);
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return price.compareTo(BigDecimal.ZERO) == 0 ? BigDecimal.ZERO : weightedTimeSum.divide(price, DEFAULT_PRECISION, ROUNDING_MODE);
+        return weightedTimeSum.divide(price, DEFAULT_PRECISION, ROUNDING_MODE);
     }
 
     private BigDecimal calculateConvexityInPeriods(List<CashFlowPeriod> cashFlow, BigDecimal discountRate, BigDecimal price) {
+        if (price.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO;
         BigDecimal convexitySum = IntStream.range(0, cashFlow.size())
                 .mapToObj(i -> {
                     BigDecimal t = BigDecimal.valueOf(i + 1);
                     BigDecimal flow = cashFlow.get(i).cashFlow().amount();
-                    BigDecimal pvFactor = BigDecimal.ONE.divide(BigDecimal.ONE.add(discountRate).pow(i + 1), DEFAULT_PRECISION, ROUNDING_MODE);
-                    return flow.multiply(pvFactor).multiply(t).multiply(t.add(BigDecimal.ONE));
+                    BigDecimal numerator = flow.multiply(t).multiply(t.add(BigDecimal.ONE));
+                    BigDecimal denominator = BigDecimal.ONE.add(discountRate).pow(i + 3);
+                    return numerator.divide(denominator, DEFAULT_PRECISION, ROUNDING_MODE);
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        if (price.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO;
-
-        return convexitySum.divide(price.multiply(BigDecimal.ONE.add(discountRate).pow(2)), DEFAULT_PRECISION, ROUNDING_MODE);
+        return convexitySum.divide(price, DEFAULT_PRECISION, ROUNDING_MODE);
     }
 
-    // --- Lógica de Tasa Interna de Retorno (TIR / IRR) ---
+    // --- Flujo de Caja con Costos para TIR (ACTUALIZADOS) ---
 
-    private List<BigDecimal> getHolderCashFlow(BondParameters params, List<CashFlowPeriod> cashFlow) {
+    /**
+     * Calcula el flujo de caja completo para el inversionista, incluyendo el desembolso inicial
+     * que considera el precio de mercado y los costos de transacción del inversionista.
+     * @param params Parámetros del bono que incluyen los costos del inversionista.
+     * @param cashFlow Flujo de caja futuro del bono (cupones y principal).
+     * @return Lista de flujos de caja para el cálculo de la TREA.
+     */
+    private List<BigDecimal> getHolderCashFlowWithCosts(BondParameters params, List<CashFlowPeriod> cashFlow) {
         List<BigDecimal> flows = new ArrayList<>();
-        flows.add(params.purchasePrice().amount().negate());
+
+        // 1. Tomar los costos (en %) desde los parámetros y convertirlos a decimal.
+        BigDecimal sabPct = params.investorSabCost().divide(BigDecimal.valueOf(100), DEFAULT_PRECISION, ROUNDING_MODE);
+        BigDecimal cavaliPct = params.investorCavaliCost().divide(BigDecimal.valueOf(100), DEFAULT_PRECISION, ROUNDING_MODE);
+
+        // 2. Sumar los porcentajes de costo.
+        BigDecimal totalCostPercentage = sabPct.add(cavaliPct);
+
+        // 3. Calcular el desembolso total (Flujo 0) y añadirlo a la lista (negativo).
+        BigDecimal totalInvestment = params.marketPrice().amount().multiply(BigDecimal.ONE.add(totalCostPercentage));
+        flows.add(totalInvestment.negate());
+
+        // 4. Añadir los flujos de caja futuros.
         cashFlow.forEach(p -> flows.add(p.cashFlow().amount()));
+
         return flows;
     }
 
-    private List<BigDecimal> getIssuerCashFlow(BondParameters params, List<CashFlowPeriod> cashFlow) {
+    /**
+     * Calcula el flujo de caja completo para el emisor, incluyendo el ingreso neto inicial
+     * que considera el valor nominal y los costos de emisión.
+     * @param params Parámetros del bono que incluyen los costos del emisor.
+     * @param cashFlow Flujo de caja futuro del bono (cupones y principal).
+     * @return Lista de flujos de caja para el cálculo de la TCEA.
+     */
+    private List<BigDecimal> getIssuerCashFlowWithCosts(BondParameters params, List<CashFlowPeriod> cashFlow) {
         List<BigDecimal> flows = new ArrayList<>();
-        BigDecimal commissionAmount = params.issuePrice().amount().multiply(params.commission().divide(BigDecimal.valueOf(100), DEFAULT_PRECISION, ROUNDING_MODE));
-        flows.add(params.issuePrice().amount().subtract(commissionAmount));
+
+        // 1. Tomar los costos (en %) desde los parámetros y convertirlos a decimal.
+        BigDecimal structPct = params.issuerStructuringCost().divide(BigDecimal.valueOf(100), DEFAULT_PRECISION, ROUNDING_MODE);
+        BigDecimal placePct = params.issuerPlacementCost().divide(BigDecimal.valueOf(100), DEFAULT_PRECISION, ROUNDING_MODE);
+        BigDecimal cavaliPct = params.issuerCavaliCost().divide(BigDecimal.valueOf(100), DEFAULT_PRECISION, ROUNDING_MODE);
+
+        // 2. Sumar los porcentajes de costo.
+        BigDecimal totalCostPercentage = structPct.add(placePct).add(cavaliPct);
+
+        // 3. Calcular el ingreso neto (Flujo 0) y añadirlo a la lista (positivo).
+        BigDecimal totalCostAmount = params.faceValue().amount().multiply(totalCostPercentage);
+        BigDecimal netProceeds = params.faceValue().amount().subtract(totalCostAmount);
+        flows.add(netProceeds);
+
+        // 4. Añadir los flujos de caja futuros (negativos para el emisor).
         cashFlow.forEach(p -> flows.add(p.cashFlow().amount().negate()));
+
         return flows;
     }
+
+    // --- Lógica de Tasa Interna de Retorno (TIR / IRR) - Sin cambios, pero se asume correcta ---
 
     private BigDecimal calculateAnnualIRR(List<BigDecimal> flows, int periodsPerYear) {
         BigDecimal ratePerPeriod = calculateIRR(flows, 0.1, 100, 1e-10);
-        // La fórmula para anualizar y multiplicar por 100 para mostrar como porcentaje es correcta.
         return BigDecimal.ONE.add(ratePerPeriod).pow(periodsPerYear).subtract(BigDecimal.ONE)
                 .multiply(BigDecimal.valueOf(100)).setScale(FINANCIAL_PRECISION, ROUNDING_MODE);
     }

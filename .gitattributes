@@ -1,2 +1,14 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+
+# Set the default behavior to automatically handle line endings.
+* text=auto
+
+# Explicitly force LF (Unix) line endings for files that need to be consistent
+# across all environments, especially scripts and config files.
+*.sh    text eol=lf
+*.properties text eol=lf
+*.xml   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+mvnw    text eol=lf

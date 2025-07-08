@@ -17,14 +17,14 @@ public class OpenApiConfiguration {
         var openApi = new OpenAPI();
         openApi
                 .info(new Info()
-                        .title("ACME Learning Platform API")
-                        .description("ACME Learning Platform application REST API documentation.")
+                        .title("Finanzas API - Plataforma de Bonos")
+                        .description("Documentación de la API REST para la gestión y valoración de bonos financieros. Incluye endpoints para crear, consultar y analizar valuaciones, flujos de caja y métricas financieras.")
                         .version("v1.0.0")
                         .license(new License().name("Apache 2.0")
-                                .url("https://springdoc.org")))
+                                .url("https://www.apache.org/licenses/LICENSE-2.0")))
                 .externalDocs(new ExternalDocumentation()
-                        .description("ACME Learning Platform wiki Documentation")
-                        .url("https://acme-learning-platform.wiki.github.io/docs"));
+                        .description("Documentación técnica y ejemplos de uso")
+                        .url("https://github.com/grupo1-finanzas/finanzas-docs"));
 
         final String securitySchemeName = "bearerAuth";
 

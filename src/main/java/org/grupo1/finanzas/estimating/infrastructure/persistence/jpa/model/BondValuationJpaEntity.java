@@ -50,11 +50,8 @@ public class BondValuationJpaEntity {
     @Column(nullable = false, precision = 18, scale = 4) private BigDecimal faceValueAmount;
     @Column(nullable = false, length = 3) private Currency faceValueCurrency;
 
-    @Column(nullable = false, precision = 18, scale = 4) private BigDecimal issuePriceAmount;
-    @Column(nullable = false, length = 3) private Currency issuePriceCurrency;
-
-    @Column(nullable = false, precision = 18, scale = 4) private BigDecimal purchasePriceAmount;
-    @Column(nullable = false, length = 3) private Currency purchasePriceCurrency;
+    @Column(nullable = false, precision = 18, scale = 4) private BigDecimal marketPriceAmount;
+    @Column(nullable = false, length = 3) private Currency marketPriceCurrency;
 
     @Column(nullable = false) private LocalDate issueDate;
     @Column(nullable = false) private LocalDate maturityDate;
@@ -70,8 +67,6 @@ public class BondValuationJpaEntity {
     @Column(nullable = false) private int graceCapitalPeriods;
     @Column(nullable = false) private int graceInterestPeriods;
 
-    @Column(nullable = false, precision = 8, scale = 5) private BigDecimal commission;
-
     @Column(nullable = false, precision = 18, scale = 10) private BigDecimal marketRateValue;
 
     @Column(precision = 18, scale = 10) private BigDecimal tcea;
@@ -85,6 +80,21 @@ public class BondValuationJpaEntity {
 
     @Column(precision = 18, scale = 4) private BigDecimal cleanPriceAmount;
     @Column(length = 3) private Currency cleanPriceCurrency;
+
+    @Column(name = "issuer_structuring_cost", nullable = false)
+    private BigDecimal issuerStructuringCost;
+
+    @Column(name = "issuer_placement_cost", nullable = false)
+    private BigDecimal issuerPlacementCost;
+
+    @Column(name = "issuer_cavali_cost", nullable = false)
+    private BigDecimal issuerCavaliCost;
+
+    @Column(name = "investor_sab_cost", nullable = false)
+    private BigDecimal investorSabCost;
+
+    @Column(name = "investor_cavali_cost", nullable = false)
+    private BigDecimal investorCavaliCost;
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JoinColumn(name = "valuation_id")
