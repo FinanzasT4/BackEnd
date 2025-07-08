@@ -32,8 +32,9 @@ public record CreateBondValuationCommand(
         if (issueDate != null && maturityDate != null && !issueDate.isBefore(maturityDate)) {
             throw new IllegalArgumentException("Issue date must be before maturity date.");
         }
-        if (rateType == RateType.EFFECTIVE && capitalization == null) {
-            throw new IllegalArgumentException("Capitalization must be provided for a effective rate.");
+
+        if (rateType == RateType.NOMINAL && capitalization == null) {
+            throw new IllegalArgumentException("Capitalization must be provided for a nominal rate.");
         }
     }
 }

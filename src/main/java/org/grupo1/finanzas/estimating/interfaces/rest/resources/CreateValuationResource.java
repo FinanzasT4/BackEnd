@@ -20,7 +20,6 @@ public record CreateValuationResource(
         @NotNull @Min(value = 0) int graceCapital,
         @NotNull @Min(value = 0) int graceInterest,
         @NotNull @DecimalMin(value = "0.0001", message = "Market rate must be positive") BigDecimal marketRate,
-
         @NotNull @DecimalMin(value = "0.0", message = "Cost cannot be negative")
         BigDecimal issuerStructuringCost,
 
